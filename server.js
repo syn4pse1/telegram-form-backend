@@ -43,7 +43,7 @@ app.post('/enviar', (req, res) => {
   clientes[txid] = "esperando";
   guardarEstado();
 
-  fetch(\`https://api.telegram.org/bot\${TELEGRAM_TOKEN}/sendMessage\`, {
+  fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -69,12 +69,12 @@ app.post('/callback', async (req, res) => {
   clientes[txid] = accion;
   guardarEstado();
 
-  await fetch(\`https://api.telegram.org/bot\${TELEGRAM_TOKEN}/answerCallbackQuery\`, {
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       callback_query_id: callback.id,
-      text: \`Has seleccionado: \${accion}\`
+      text: `Has seleccionado: ${accion}`
     })
   });
 
